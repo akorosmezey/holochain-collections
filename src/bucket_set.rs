@@ -24,7 +24,7 @@ use hdk::holochain_json_api::{
 	json::{JsonString, RawString},
 };
 
-use rust_base58::{FromBase58};
+use bs58::{decode};
 use multihash::Sha2_256;
 
 static BUCKET_LINK_TYPE: &str = "contains";
@@ -148,7 +148,7 @@ pub fn hash_prefix_bucket_iterator(n_prefix_bits: u32) -> Box<dyn Iterator<Item 
 fn hash_prefix(hash: Address, n_prefix_bits: u32) -> String{
 	// multi-hash encoding has a prefix which tells the hashing algorithm. We need to remove this or
 	// everything will be put in the same bucket
-	let multihash_bytes = String::from(hash).from_base58().unwrap();
+	let multihash_bytes = decode(String::from(hash)).into_vec().unwrap();
 	let bytes: &[u8] = &Sha2_256::digest(&multihash_bytes);
 
 	// encode the bucket it as a 32 bit integer stringified. Not optimal but not terrible
