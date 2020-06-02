@@ -1,6 +1,6 @@
 /**
  * Defines a bucket which is a special kind of base for a particular app entry.
- * 
+ *
  * Buckets have an id which must be deterministicly derivable from an entry.
  * This way it is always possible to figure out which bucket an entry must belong to.
  */
@@ -25,6 +25,7 @@ use hdk::holochain_json_api::{
 };
 
 use rust_base58::{FromBase58};
+use multihash::Sha2_256;
 
 static BUCKET_LINK_TYPE: &str = "contains";
 
@@ -148,7 +149,7 @@ fn hash_prefix(hash: Address, n_prefix_bits: u32) -> String{
 	// multi-hash encoding has a prefix which tells the hashing algorithm. We need to remove this or
 	// everything will be put in the same bucket
 	let multihash_bytes = String::from(hash).from_base58().unwrap();
-	let bytes: &[u8] = multihash::decode(&multihash_bytes).unwrap().digest;
+	let bytes: &[u8] = &Sha2_256::digest(&multihash_bytes);
 
 	// encode the bucket it as a 32 bit integer stringified. Not optimal but not terrible
 	let mask: u32 = 2_u32.pow(n_prefix_bits) - 1;
