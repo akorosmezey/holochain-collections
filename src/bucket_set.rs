@@ -26,11 +26,11 @@ use hdk::holochain_json_api::{
 
 use bs58::{decode};
 
-static BUCKET_LINK_TYPE: &str = "contains";
+static BUCKET_LINK_TYPE: [&str; 2] = ["contains_0_", "contains_1_"];
 
 pub struct BucketEntry {
 	bucket_for: AppEntryType,
-	id: String,
+	id: String
 }
 
 pub fn bucket_entry_type_for(entry_type: AppEntryType) -> AppEntryType {
@@ -67,7 +67,17 @@ pub fn bucket_entry_def_for(entry_type: AppEntryType) -> ValidatingEntryType {
         links: [
             to!(
                 entry_type.clone(),
-                link_type: BUCKET_LINK_TYPE,
+                link_type: BUCKET_LINK_TYPE[0],
+                validation_package: || {
+                    hdk::ValidationPackageDefinition::Entry
+                },
+                validation: |_validation_data: hdk::LinkValidationData| {
+                    Ok(())
+                }
+            ),
+            to!(
+                entry_type.clone(),
+                link_type: BUCKET_LINK_TYPE[1],
                 validation_package: || {
                     hdk::ValidationPackageDefinition::Entry
                 },
@@ -80,8 +90,7 @@ pub fn bucket_entry_def_for(entry_type: AppEntryType) -> ValidatingEntryType {
 }
 
 impl BucketEntry {
-
-	pub fn entry(&self) -> Entry {
+	  pub fn entry(&self) -> Entry {
 		Entry::App(
 			bucket_entry_type_for(self.bucket_for.clone()),
 			RawString::from(self.id.clone()).into()
@@ -90,43 +99,57 @@ impl BucketEntry {
 }
 
 pub trait BucketSetStorable {
-	fn derive_bucket_id(&self) -> String;
+	fn derive_bucket_id(&self, index: usize) -> String;
 
-	fn get_bucket(&self, entry_type: AppEntryType) -> BucketEntry {
-		BucketEntry{
-			bucket_for: entry_type.to_owned(),
-			id: self.derive_bucket_id(),
-		}
+	fn derive_bucket_link_name(&self, index: usize) -> String;
+
+	fn get_bucket(&self, entry_type: AppEntryType, index: usize) -> BucketEntry {
+			BucketEntry{
+					bucket_for: entry_type.to_owned(),
+					id: self.derive_bucket_id(index)
+			}
 	}
 }
 
 pub trait BucketIterable {
-	fn buckets() -> Box<dyn Iterator<Item = String>>;
+	fn buckets(index: usize) -> Box<dyn Iterator<Item = String>>;
 }
 
 pub fn store<T: Into<JsonString> + BucketSetStorable>( entry_type: AppEntryType, entry_data: T) -> ZomeApiResult<Address> {
-	let bucket_address = hdk::commit_entry(&entry_data.get_bucket(entry_type.clone()).entry())?;
+	let bucket_address_0 = hdk::commit_entry(&entry_data.get_bucket(entry_type.clone(), 0).entry())?;
+	  let bucket_address_1 = hdk::commit_entry(&entry_data.get_bucket(entry_type.clone(), 1).entry())?;
+    let link_name_0 = &entry_data.derive_bucket_link_name(0);
+    let link_name_1 = &entry_data.derive_bucket_link_name(1);
 	let entry = Entry::App(
 		entry_type,
 		entry_data.into()
 	);
 	let entry_address = hdk::commit_entry(&entry)?;
-	hdk::link_entries(&bucket_address, &entry_address, BUCKET_LINK_TYPE, "")?;
+	hdk::link_entries(&bucket_address_0, &entry_address, BUCKET_LINK_TYPE[0], link_name_0)?;
+	hdk::link_entries(&bucket_address_1, &entry_address, BUCKET_LINK_TYPE[1], link_name_1)?;
 	Ok(entry_address)
 }
 
-pub fn retrieve(entry_type: AppEntryType, bucket_id: String) -> ZomeApiResult<Vec<Address>> {
+pub fn retrieve_bucket(entry_type: AppEntryType, bucket_id: String, index: usize) -> ZomeApiResult<Vec<Address>> {
 	let bucket_address = BucketEntry{
 		bucket_for: entry_type.to_owned(),
 		id: bucket_id
 	}.entry().address();
-	Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE), LinkMatch::Any)?.addresses())
+	Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Any)?.addresses())
 }
 
-pub fn retrieve_all<T: BucketIterable>(entry_type: AppEntryType) -> ZomeApiResult<Vec<Address>> {
+pub fn retrieve(entry_type: AppEntryType, bucket_id: String, link_name: String, index: usize) -> ZomeApiResult<Vec<Address>> {
+	let bucket_address = BucketEntry{
+		bucket_for: entry_type.to_owned(),
+		id: bucket_id
+	}.entry().address();
+	Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Exactly(&link_name))?.addresses())
+}
+
+pub fn retrieve_all<T: BucketIterable>(entry_type: AppEntryType, index: usize) -> ZomeApiResult<Vec<Address>> {
 	Ok(
-		T::buckets().into_iter().fold(Vec::new(), |mut addresses, bucket_id| {
-			addresses.extend(retrieve(entry_type.clone(), bucket_id).unwrap_or(Vec::new()));
+		T::buckets(index).into_iter().fold(Vec::new(), |mut addresses, bucket_id| {
+			addresses.extend(retrieve_bucket(entry_type.clone(), bucket_id, index).unwrap_or(Vec::new()));
 			addresses
 		})
 	)
