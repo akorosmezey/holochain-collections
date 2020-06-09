@@ -25,7 +25,6 @@ use hdk::holochain_json_api::{
 };
 
 use bs58::{decode};
-use multihash::Sha2_256;
 
 static BUCKET_LINK_TYPE: &str = "contains";
 
@@ -149,7 +148,7 @@ fn hash_prefix(hash: Address, n_prefix_bits: u32) -> String{
 	// multi-hash encoding has a prefix which tells the hashing algorithm. We need to remove this or
 	// everything will be put in the same bucket
 	let multihash_bytes = decode(String::from(hash)).into_vec().unwrap();
-	let bytes: &[u8] = &Sha2_256::digest(&multihash_bytes);
+	  let bytes: &[u8] = multihash::decode(&multihash_bytes).unwrap().digest;
 
 	// encode the bucket it as a 32 bit integer stringified. Not optimal but not terrible
 	let mask: u32 = 2_u32.pow(n_prefix_bits) - 1;
@@ -174,7 +173,7 @@ fn hash_prefix(hash: Address, n_prefix_bits: u32) -> String{
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use multihash::Hash;
+    use multihash::Hash;
 
     #[test]
     fn test_hash_prefix() {
