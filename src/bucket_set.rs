@@ -101,7 +101,7 @@ impl BucketEntry {
 pub trait BucketSetStorable {
 		fn derive_bucket_id(&self, index: usize) -> String;
 
-		fn derive_bucket_link_name(&self, index: usize) -> String;
+		fn derive_bucket_link_name(&self, index: usize) -> JsonString;
 
 		fn get_bucket(&self, entry_type: AppEntryType, index: usize) -> BucketEntry {
 				BucketEntry{
@@ -118,15 +118,15 @@ pub trait BucketIterable {
 pub fn store<T: Into<JsonString> + BucketSetStorable>( entry_type: AppEntryType, entry_data: T) -> ZomeApiResult<Address> {
 		let bucket_address_0 = hdk::commit_entry(&entry_data.get_bucket(entry_type.clone(), 0).entry())?;
 		let bucket_address_1 = hdk::commit_entry(&entry_data.get_bucket(entry_type.clone(), 1).entry())?;
-		let link_name_0 = &entry_data.derive_bucket_link_name(0);
-		let link_name_1 = &entry_data.derive_bucket_link_name(1);
+		let link_name_0: String = entry_data.derive_bucket_link_name(0).to_string();
+		let link_name_1: String = entry_data.derive_bucket_link_name(1).to_string();
 		let entry = Entry::App(
 				entry_type,
 				entry_data.into()
 		);
 		let entry_address = hdk::commit_entry(&entry)?;
-		hdk::link_entries(&bucket_address_0, &entry_address, BUCKET_LINK_TYPE[0], link_name_0)?;
-		hdk::link_entries(&bucket_address_1, &entry_address, BUCKET_LINK_TYPE[1], link_name_1)?;
+		hdk::link_entries(&bucket_address_0, &entry_address, BUCKET_LINK_TYPE[0], &link_name_0)?;
+		hdk::link_entries(&bucket_address_1, &entry_address, BUCKET_LINK_TYPE[1], &link_name_1)?;
 		Ok(entry_address)
 }
 
