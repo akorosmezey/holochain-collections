@@ -33,6 +33,12 @@ pub struct BucketEntry {
 		id: String
 }
 
+pub struct BucketKey {
+    bucket_id: String,
+    link_name: String,
+    index:     usize
+}
+
 pub fn bucket_entry_type_for(entry_type: AppEntryType) -> AppEntryType {
 		format!("__bucket_for_{}", entry_type.to_string()).into()
 }
@@ -115,7 +121,7 @@ pub trait BucketIterable {
 		fn buckets(index: usize) -> Box<dyn Iterator<Item = String>>;
 }
 
-pub fn store<T: Into<JsonString> + BucketSetStorable>( entry_type: AppEntryType, entry_data: T) -> ZomeApiResult<Address> {
+pub fn store<T: Into<JsonString> + BucketSetStorable>(entry_type: AppEntryType, entry_data: T) -> ZomeApiResult<Address> {
 		let bucket_address_0 = hdk::commit_entry(&entry_data.get_bucket(entry_type.clone(), 0).entry())?;
 		let bucket_address_1 = hdk::commit_entry(&entry_data.get_bucket(entry_type.clone(), 1).entry())?;
 		let link_name_0: String = entry_data.derive_bucket_link_name(0).to_string();
@@ -138,12 +144,12 @@ pub fn retrieve_bucket(entry_type: AppEntryType, bucket_id: String, index: usize
 		Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Any)?.addresses())
 }
 
-pub fn retrieve(entry_type: AppEntryType, bucket_id: String, link_name: String, index: usize) -> ZomeApiResult<Address> {
+pub fn retrieve(entry_type: AppEntryType, key: BucketKey) -> ZomeApiResult<Address> {
 		let bucket_address = BucketEntry{
 				bucket_for: entry_type.to_owned(),
-				id: bucket_id
+				id: key.bucket_id
 		}.entry().address();
-		let links = hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Exactly(&link_name))?.addresses();
+		let links = hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[key.index]), LinkMatch::Exactly(&key.link_name))?.addresses();
     if links.len() == 1 {
         let addr = links[0].clone();
         return Ok(addr);
