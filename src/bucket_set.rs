@@ -34,9 +34,9 @@ pub struct BucketEntry {
 }
 
 pub struct BucketKey {
-    bucket_id: String,
-    link_name: String,
-    index:     usize
+    pub bucket_id: String,
+    pub link_name: String,
+    pub index:     usize
 }
 
 pub fn bucket_entry_type_for(entry_type: AppEntryType) -> AppEntryType {
@@ -144,17 +144,14 @@ pub fn retrieve_bucket(entry_type: AppEntryType, bucket_id: String, index: usize
 		Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Any)?.addresses())
 }
 
-pub fn retrieve(entry_type: AppEntryType, key: BucketKey) -> ZomeApiResult<Address> {
+pub fn retrieve(entry_type: AppEntryType, key: BucketKey) -> ZomeApiResult<Option<Entry>> {
 		let bucket_address = BucketEntry{
 				bucket_for: entry_type.to_owned(),
 				id: key.bucket_id
 		}.entry().address();
-		let links = hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[key.index]), LinkMatch::Exactly(&key.link_name))?.addresses();
-    if links.len() == 1 {
-        let addr = links[0].clone();
-        return Ok(addr);
-    } else {
-        return Err(hdk::error::ZomeApiError::HashNotFound);
+		match hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[key.index]), LinkMatch::Exactly(&key.link_name))?.addresses().first() {
+        Some(addr) => hdk::get_entry(&addr),
+        None       => Err(hdk::error::ZomeApiError::HashNotFound)
     }
 }
 
