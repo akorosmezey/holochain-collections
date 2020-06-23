@@ -138,12 +138,18 @@ pub fn retrieve_bucket(entry_type: AppEntryType, bucket_id: String, index: usize
 		Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Any)?.addresses())
 }
 
-pub fn retrieve(entry_type: AppEntryType, bucket_id: String, link_name: String, index: usize) -> ZomeApiResult<Vec<Address>> {
+pub fn retrieve(entry_type: AppEntryType, bucket_id: String, link_name: String, index: usize) -> ZomeApiResult<Address> {
 		let bucket_address = BucketEntry{
 				bucket_for: entry_type.to_owned(),
 				id: bucket_id
 		}.entry().address();
-		Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Exactly(&link_name))?.addresses())
+		let links = hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Exactly(&link_name))?.addresses();
+    if links.len() == 1 {
+        let addr = links[0].clone();
+        return Ok(addr);
+    } else {
+        return Err(hdk::error::ZomeApiError::HashNotFound);
+    }
 }
 
 pub fn retrieve_all<T: BucketIterable>(entry_type: AppEntryType, index: usize) -> ZomeApiResult<Vec<Address>> {
