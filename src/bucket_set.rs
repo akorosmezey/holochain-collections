@@ -26,7 +26,7 @@ use hdk::holochain_json_api::{
 
 use bs58::{decode};
 
-static BUCKET_LINK_TYPE: [&str; 2] = ["contains_0_", "contains_1_"];
+static BUCKET_LINK_TYPE: [&str; 2] = ["link_0_", "link_1_"];
 
 pub struct BucketEntry {
 		bucket_for: AppEntryType,
@@ -73,7 +73,7 @@ pub fn bucket_entry_def_for(entry_type: AppEntryType) -> ValidatingEntryType {
 				links: [
 						to!(
 								entry_type.clone(),
-								link_type: BUCKET_LINK_TYPE[0],
+								link_type: bucket_link_type(entry_type.clone(), 0),
 								validation_package: || {
 										hdk::ValidationPackageDefinition::Entry
 								},
@@ -83,7 +83,7 @@ pub fn bucket_entry_def_for(entry_type: AppEntryType) -> ValidatingEntryType {
 						),
 						to!(
 								entry_type.clone(),
-								link_type: BUCKET_LINK_TYPE[1],
+								link_type: bucket_link_type(entry_type.clone(), 1),
 								validation_package: || {
 										hdk::ValidationPackageDefinition::Entry
 								},
@@ -127,12 +127,12 @@ pub fn store<T: Into<JsonString> + BucketSetStorable>(entry_type: AppEntryType, 
 		let link_name_0: String = entry_data.derive_bucket_link_name(0).to_string();
 		let link_name_1: String = entry_data.derive_bucket_link_name(1).to_string();
 		let entry = Entry::App(
-				entry_type,
+				entry_type.clone(),
 				entry_data.into()
 		);
 		let entry_address = hdk::commit_entry(&entry)?;
-		hdk::link_entries(&bucket_address_0, &entry_address, BUCKET_LINK_TYPE[0], &link_name_0)?;
-		hdk::link_entries(&bucket_address_1, &entry_address, BUCKET_LINK_TYPE[1], &link_name_1)?;
+		hdk::link_entries(&bucket_address_0, &entry_address, bucket_link_type(entry_type.clone(), 0), link_name_0)?;
+		hdk::link_entries(&bucket_address_1, &entry_address, bucket_link_type(entry_type.clone(), 1), link_name_1)?;
 		Ok(entry_address)
 }
 
@@ -141,7 +141,7 @@ pub fn retrieve_bucket(entry_type: AppEntryType, bucket_id: String, index: usize
 				bucket_for: entry_type.to_owned(),
 				id: bucket_id
 		}.entry().address();
-		Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[index]), LinkMatch::Any)?.addresses())
+		Ok(hdk::get_links(&bucket_address, LinkMatch::Exactly(&bucket_link_type(entry_type, index)), LinkMatch::Any)?.addresses())
 }
 
 pub fn retrieve(entry_type: AppEntryType, key: BucketKey) -> ZomeApiResult<Option<Entry>> {
@@ -149,7 +149,7 @@ pub fn retrieve(entry_type: AppEntryType, key: BucketKey) -> ZomeApiResult<Optio
 				bucket_for: entry_type.to_owned(),
 				id: key.bucket_id
 		}.entry().address();
-		match hdk::get_links(&bucket_address, LinkMatch::Exactly(BUCKET_LINK_TYPE[key.index]), LinkMatch::Exactly(&key.link_name))?.addresses().first() {
+		match hdk::get_links(&bucket_address, LinkMatch::Exactly(&bucket_link_type(entry_type, key.index)), LinkMatch::Exactly(&key.link_name))?.addresses().first() {
         Some(addr) => hdk::get_entry(&addr),
         None       => Err(hdk::error::ZomeApiError::HashNotFound)
     }
@@ -199,7 +199,9 @@ fn hash_prefix(hash: Address, n_prefix_bits: u32) -> String{
 		id.to_string()
 }
 
-
+fn bucket_link_type(entry_type: AppEntryType, index: usize) -> String {
+    format!("{}{}", BUCKET_LINK_TYPE[index], entry_type.to_string())
+}
 
 #[cfg(test)]
 mod tests {
